@@ -1,0 +1,147 @@
+name: Sürüm yayınla
+
+# "v1.2.3" biçiminde bir etiket gönderildiğinde Windows (.exe), macOS (.dmg) ve Linux (.deb, AppImage) kurulum
+# dosyalarını derler ve public Muhammed61/rowly-releases reposunun Releases bölümüne yükler.
+# Kurulu uygulamalar güncellemeleri o repodan alır.
+# Gerekli secret: RELEASES_TOKEN (rowly-releases için Contents: Read and write).
+# Actions sekmesinden elle "Run workflow" denirse sadece derlenir, yayınlanmaz (deneme için).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Etiket ve package.json sürümü aynı mı?
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Etiket $GITHUB_REF_NAME ile package.json sürümü $v uyuşmuyor"; exit 1; }
+
+      - name: RELEASES_TOKEN tanımlı mı?
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          T: ${{ secrets.RELEASES_TOKEN }}
+        run: '[ -n "$T" ] || { echo "RELEASES_TOKEN secret eksik (Settings > Secrets and variables > Actions)"; exit 1; }'
+
+  build:
+    needs: check
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist
+            name: windows
+          - os: macos-latest
+            script: dist:mac
+            name: macos
+          - os: ubuntu-latest
+            script: dist:linux
+            name: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tip kontrolü
+        run: npm run typecheck
+
+      - name: Kurulum dosyalarını derle
+        run: npm run ${{ matrix.script }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.deb
+            release/*.AppImage
+            release/*.blockmap
+            release/latest*.yml
+
+  # Dosyalar GitHub CLI ile tek seferde yüklenir ve her biri kontrol edildikten sonra
+  # sürüm yayına alınır. Derlemelerden biri bile başarısız olursa hiçbir şey yayınlanmaz;
+  # latest*.yml dosyaları eksik kalırsa kurulu uygulamalar yeni sürümü göremez.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      # İndirilen dosyanın bozulmadığını / değiştirilmediğini kontrol etmek için
+      - name: SHA256 özetlerini hesapla
+        working-directory: release
+        run: sha256sum Rowly-*.exe Rowly-*.dmg Rowly-*.zip Rowly-*.deb Rowly-*.AppImage | tee SHA256SUMS.txt
+
+      # Kurulum dosyalarının bu depodaki kaynak koddan GitHub Actions'ta derlendiğinin
+      # imzalı kanıtı (Sigstore). Doğrulama: gh attestation verify <dosya> --repo Muhammed61/rowly
+      - name: Derleme kanıtı oluştur
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            release/Rowly-*.exe
+            release/Rowly-*.dmg
+            release/Rowly-*.zip
+            release/Rowly-*.deb
+            release/Rowly-*.AppImage
+
+      - name: Sürüm reposuna yükle ve yayına al
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          repo=Muhammed61/rowly-releases
+          tag="$GITHUB_REF_NAME"
+          v="${tag#v}"
+          required=("Rowly-Setup-$v.exe" "Rowly-Setup-$v.exe.blockmap" "latest.yml"
+                    "Rowly-$v-arm64.dmg" "Rowly-$v-x64.dmg" "Rowly-$v-arm64.zip" "Rowly-$v-x64.zip" "latest-mac.yml"
+                    "Rowly-$v-amd64.deb" "Rowly-$v-arm64.deb" "Rowly-$v-x86_64.AppImage" "Rowly-$v-arm64.AppImage"
+                    "latest-linux.yml" "latest-linux-arm64.yml" "SHA256SUMS.txt")
+          for f in "${required[@]}"; do [ -f "release/$f" ] || { echo "Derlemede eksik dosya: $f"; ls release; exit 1; }; done
+          files=(release/*)
+
+          if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --repo "$repo" --clobber
+          else
+            gh release create "$tag" "${files[@]}" --repo "$repo" --latest --title "Rowly $v" --notes "Rowly $v
+
+          **Windows:** Rowly-Setup-$v.exe dosyasını indirip çalıştırın. Kurulum dosyası imzasız olduğu için SmartScreen uyarı verebilir: Ek bilgi → Yine de çalıştır.
+
+          **macOS:** Apple Silicon (M1/M2/M3/M4) için Rowly-$v-arm64.dmg, Intel Mac için Rowly-$v-x64.dmg dosyasını indirin, açın ve Rowly'yi Uygulamalar klasörüne sürükleyin. Uygulama Apple sertifikasıyla imzalı olmadığı için ilk açılışta uyarı çıkar: Sistem Ayarları → Gizlilik ve Güvenlik → Yine de Aç. \"Hasarlı\" uyarısı çıkarsa Terminal'de bir kez şunu çalıştırın: xattr -cr /Applications/Rowly.app
+
+          **Linux (Debian, Ubuntu, Kali):** Rowly-$v-amd64.deb dosyasını indirip şunu çalıştırın: sudo apt install ./Rowly-$v-amd64.deb (ARM cihazlar için arm64.deb). Kurulumsuz kullanmak için .AppImage dosyası da var: chmod +x ile çalıştırılabilir yapıp açın (libfuse2 gerekir).
+
+          **Doğrulama:** Dosyaların SHA256 özetleri SHA256SUMS.txt içindedir. Her dosyanın Muhammed61/rowly deposundaki kaynak koddan GitHub Actions'ta derlendiği şu komutla doğrulanabilir: gh attestation verify <dosya> --repo Muhammed61/rowly
+
+          Kurulu uygulamalar yeni sürümü kendiliğinden bulur."
+          fi
+
+          assets=$(gh release view "$tag" --repo "$repo" --json assets --jq '.assets[].name')
+          echo "Yüklenen dosyalar:"; echo "$assets"
+          for f in "${required[@]}"; do
+            echo "$assets" | grep -qx "$f" || { echo "Sürümde eksik dosya: $f"; exit 1; }
+          done
+          gh release edit "$tag" --repo "$repo" --draft=false --latest

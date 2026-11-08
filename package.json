@@ -1,0 +1,166 @@
+{
+  "name": "rowly",
+  "productName": "Rowly",
+  "version": "1.0.0",
+  "description": "Rowly: TablePlus benzeri, ücretsiz ve açık kaynak veritabanı istemcisi (MySQL, PostgreSQL, SQL Server, SQLite, MongoDB, Redis…)",
+  "main": "out/main/index.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dist": "electron-vite build && electron-builder --win --publish never",
+    "dist:dir": "electron-vite build && electron-builder --win --dir --publish never",
+    "icon": "electron scripts/make-icon.cjs",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:linux": "electron-vite build && electron-builder --linux --publish never"
+  },
+  "build": {
+    "appId": "com.muhammed61.rowly",
+    "productName": "Rowly",
+    "copyright": "Copyright © 2026 Muhammed61",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "Rowly-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rowly",
+      "installerLanguages": [
+        "tr_TR"
+      ],
+      "language": "1055",
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.developer-tools",
+      "artifactName": "Rowly-${version}-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "12.0"
+    },
+    "dmg": {
+      "title": "Rowly ${version}",
+      "artifactName": "Rowly-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "Ücretsiz veritabanı istemcisi",
+      "maintainer": "Muhammed61 <muhammed61@users.noreply.github.com>",
+      "executableName": "rowly",
+      "artifactName": "Rowly-${version}-${arch}.${ext}",
+      "desktop": {
+        "entry": {
+          "Name": "Rowly",
+          "Comment": "Ücretsiz veritabanı istemcisi",
+          "Keywords": "database;sql;mysql;postgresql;sqlite;mongodb;redis;"
+        }
+      }
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Muhammed61",
+      "repo": "rowly-releases"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "ioredis": "^6.0.0",
+    "mongodb": "^7.8.0",
+    "mssql": "^12.7.14",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1",
+    "sql.js": "^1.15.2",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/view": "^6.43.15",
+    "@tanstack/react-virtual": "^3.14.26",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/sql.js": "^1.4.11",
+    "@types/ssh2": "^1.15.6",
+    "@uiw/react-codemirror": "^4.25.12",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "45.2.1",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "lucide-react": "^1.70.0",
+    "playwright-core": "^1.65.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "zustand": "^5.1.0"
+  },
+  "author": "Muhammed61",
+  "homepage": "https://github.com/Muhammed61/rowly",
+  "bugs": "https://github.com/Muhammed61/rowly/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Muhammed61/rowly.git"
+  }
+}
